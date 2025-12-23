@@ -29,6 +29,30 @@ enum skillsid_t
 	SKILLVALUE_PERCENT = 2,
 };
 
+// Prey System
+static constexpr uint8_t PREY_SLOTCOUNT = 3;
+
+enum PreyBonus_t : uint8_t
+{
+	PREY_BONUS_DAMAGE = 0,
+	PREY_BONUS_DEFENSE = 1,
+	PREY_BONUS_EXPERIENCE = 2,
+	PREY_BONUS_LOOT = 3,
+	PREY_BONUS_NONE = 4
+};
+
+struct PreyData
+{
+	uint8_t state = 0;           // 0=locked, 1=inactive, 2=active, 3=selection, 4=selectionChangeMonster, 5=listSelection
+	PreyBonus_t bonusType = PREY_BONUS_NONE;
+	uint16_t bonusValue = 0;
+	uint8_t bonusGrade = 0;      // 1=common, 2=uncommon, 3=rare
+	std::string preyMonster;
+	uint16_t timeLeft = 0;       // in seconds
+	std::vector<std::string> preyList;
+	uint16_t freeRerollTime = 0; // timestamp for next free reroll
+};
+
 enum fightMode_t : uint8_t
 {
 	FIGHTMODE_ATTACK = 1,
@@ -167,6 +191,25 @@ public:
 
 	uint64_t getBankBalance() const { return bankBalance; }
 	void setBankBalance(uint64_t balance) { bankBalance = balance; }
+
+	// Prey System
+	PreyData& getPreyData(uint8_t slotId) { return preyData[slotId]; }
+	const PreyData& getPreyData(uint8_t slotId) const { return preyData[slotId]; }
+	uint16_t getFreeRerollTime(uint8_t slotId) const { return preyData[slotId].freeRerollTime; }
+	void setFreeRerollTime(uint8_t slotId, uint16_t time) { preyData[slotId].freeRerollTime = time; }
+	uint64_t getBonusRerollCount() const { return bonusRerollCount; }
+	void setBonusRerollCount(uint64_t count) { bonusRerollCount = count; }
+	uint32_t getPreyWildcards() const { return preyWildcards; }
+	void addPreyWildcards(uint32_t amount) { preyWildcards += amount; }
+	bool removePreyWildcards(uint32_t amount) {
+		if (preyWildcards >= amount) {
+			preyWildcards -= amount;
+			return true;
+		}
+		return false;
+	}
+	void loadPreyData();
+	void savePreyData();
 
 	Guild_ptr getGuild() const { return guild; }
 	void setGuild(Guild_ptr guild);
@@ -1330,6 +1373,11 @@ private:
 	bool addAttackSkillPoint = false;
 	bool inventoryAbilities[CONST_SLOT_LAST + 1] = {};
 	bool randomizeMount = false;
+
+	// Prey System
+	PreyData preyData[PREY_SLOTCOUNT];
+	uint64_t bonusRerollCount = 0;
+	uint32_t preyWildcards = 0;
 
 	static uint32_t playerAutoID;
 	static uint32_t playerIDLimit;

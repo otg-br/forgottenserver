@@ -535,6 +535,99 @@ function Player.sendBestiaryMilestoneReached(self, raceId)
 	return true
 end
 
+-- Prey System Functions
+function Player.getPreySlotData(self, slotId)
+	local preySlotKey = PlayerStorageKeys.preySlotBase + slotId
+	local preyData = self:getStorageValue(preySlotKey)
+	
+	-- Check if storage is not set or is a number (not initialized properly)
+	if preyData == -1 or type(preyData) == "number" then
+		return nil
+	end
+	
+	-- Ensure preyData is a string
+	if type(preyData) ~= "string" then
+		return nil
+	end
+	
+	local data = {}
+	for value in preyData:gmatch("[^|]+") do
+		table.insert(data, value)
+	end
+	
+	local raceList = {}
+	if data[7] and data[7] ~= "" then
+		for raceId in data[7]:gmatch("%d+") do
+			table.insert(raceList, tonumber(raceId))
+		end
+	end
+	
+	return {
+		id = slotId,
+		state = tonumber(data[1]) or 0,
+		selectedRaceId = tonumber(data[2]) or 0,
+		bonus = tonumber(data[3]) or 4,
+		bonusPercentage = tonumber(data[4]) or 0,
+		bonusRarity = tonumber(data[5]) or 0,
+		bonusTimeLeft = tonumber(data[6]) or 0,
+		raceIdList = raceList,
+		freeRerollTime = tonumber(data[8]) or 0,
+		option = tonumber(data[9]) or 0
+	}
+end
+
+function Player.setPreySlotData(self, slot)
+	local preySlotKey = PlayerStorageKeys.preySlotBase + slot.id
+	local raceListStr = table.concat(slot.raceIdList, ",")
+	local preyData = string.format("%d|%d|%d|%d|%d|%d|%s|%d|%d",
+		slot.state,
+		slot.selectedRaceId,
+		slot.bonus,
+		slot.bonusPercentage,
+		slot.bonusRarity,
+		slot.bonusTimeLeft,
+		raceListStr,
+		slot.freeRerollTime,
+		slot.option
+	)
+	return self:setStorageValue(preySlotKey, preyData)
+end
+
+function Player.getPreyWildcards(self)
+	return math.max(0, self:getStorageValue(PlayerStorageKeys.preyWildcards))
+end
+
+function Player.addPreyWildcards(self, amount)
+	local current = self:getPreyWildcards()
+	return self:setStorageValue(PlayerStorageKeys.preyWildcards, current + amount)
+end
+
+function Player.removePreyWildcards(self, amount)
+	local current = self:getPreyWildcards()
+	if current >= amount then
+		return self:setStorageValue(PlayerStorageKeys.preyWildcards, current - amount)
+	end
+	return false
+end
+
+function Player.sendPreyTimeLeft(self, slotId)
+	local slot = self:getPreySlotData(slotId)
+	if not slot then
+		print(string.format("[PREY DEBUG] Player.sendPreyTimeLeft - Slot %d not found", slotId))
+		return false
+	end
+	
+	print(string.format("[PREY DEBUG] Player.sendPreyTimeLeft - Slot %d, time left: %d", slotId, slot.bonusTimeLeft))
+	
+	local msg = NetworkMessage()
+	msg:addByte(0xE7)
+	msg:addByte(slotId)
+	msg:addU16(math.max(0, slot.bonusTimeLeft))
+	msg:sendToPlayer(self)
+	msg:delete()
+	return true
+end
+
 local function getStaminaBonus(staminaMinutes)
 	if staminaMinutes > 2340 then
 		return 150
@@ -733,6 +826,72 @@ function Player.disableLoginMusic(self)
 	msg:addByte(0x01)
 	msg:addByte(0x00)
 	msg:addByte(0x00)
+	msg:sendToPlayer(self)
+	msg:delete()
+	return true
+end
+
+-- Reload prey slot (send updated data to client)
+function Player.reloadPreySlot(self, slotId)
+	local slot = self:getPreyData(slotId)
+	if not slot then
+		return false
+	end
+	
+	local msg = NetworkMessage()
+	msg:addByte(0xE8)
+	msg:addByte(slotId)
+	msg:addByte(slot.state)
+	
+	if slot.state == 0 then
+		msg:addByte(self:isPremium() and 1 or 0)
+	elseif slot.state == 2 then
+		msg:addString(slot.preyMonster)
+		local mType = MonsterType(slot.preyMonster)
+		if mType then
+			local outfit = mType:getOutfit()
+			msg:addU16(outfit.lookType)
+			if outfit.lookType == 0 then
+				msg:addU16(outfit.lookTypeEx or 0)
+			else
+				msg:addByte(outfit.lookHead)
+				msg:addByte(outfit.lookBody)
+				msg:addByte(outfit.lookLegs)
+				msg:addByte(outfit.lookFeet)
+				msg:addByte(outfit.lookAddons)
+			end
+		end
+		msg:addByte(slot.bonusType)
+		msg:addU16(slot.bonusValue)
+		msg:addByte(slot.bonusGrade)
+		msg:addU16(slot.timeLeft)
+	elseif slot.state == 3 then
+		msg:addByte(#slot.preyList)
+		for _, monsterName in ipairs(slot.preyList) do
+			local mType = MonsterType(monsterName)
+			if mType then
+				msg:addString(monsterName)
+				local outfit = mType:getOutfit()
+				msg:addU16(outfit.lookType)
+				if outfit.lookType == 0 then
+					msg:addU16(outfit.lookTypeEx or 0)
+				else
+					msg:addByte(outfit.lookHead)
+					msg:addByte(outfit.lookBody)
+					msg:addByte(outfit.lookLegs)
+					msg:addByte(outfit.lookFeet)
+					msg:addByte(outfit.lookAddons)
+				end
+			end
+		end
+	elseif slot.state == 5 then
+		msg:addU16(0)
+	end
+	
+	local freeRerollTimeSeconds = self:getFreeRerollTime(slotId) * 60
+	msg:addU32(freeRerollTimeSeconds)
+	msg:addByte(slot.option or 0)
+	
 	msg:sendToPlayer(self)
 	msg:delete()
 	return true

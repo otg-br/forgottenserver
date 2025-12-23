@@ -522,6 +522,10 @@ bool IOLoginData::loadPlayer(Player* player, DBResult_ptr result)
 	player->updateBaseSpeed();
 	player->updateInventoryWeight();
 	player->updateItemsLight(true);
+	
+	// Load prey data
+	player->loadPreyData();
+	
 	return true;
 }
 
@@ -882,6 +886,9 @@ bool IOLoginData::savePlayer(Player* player)
 	if (!mountQuery.execute()) {
 		return false;
 	}
+
+	// Save prey data
+	player->savePreyData();
 
 	// End the transaction
 	return transaction.commit();

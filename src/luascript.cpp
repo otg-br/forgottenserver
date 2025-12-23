@@ -2369,6 +2369,7 @@ void LuaScriptInterface::registerFunctions()
 	registerMethod(L, "Game", "getNpcCount", LuaScriptInterface::luaGameGetNpcCount);
 	registerMethod(L, "Game", "getMonsterTypes", LuaScriptInterface::luaGameGetMonsterTypes);
 	registerMethod(L, "Game", "getBestiary", LuaScriptInterface::luaGameGetBestiary);
+	registerMethod(L, "Game", "getPreyMonsters", LuaScriptInterface::luaGameGetPreyMonsters); // Prey System
 	registerMethod(L, "Game", "getCurrencyItems", LuaScriptInterface::luaGameGetCurrencyItems);
 	registerMethod(L, "Game", "getItemTypeByClientId", LuaScriptInterface::luaGameGetItemTypeByClientId);
 	registerMethod(L, "Game", "getMountIdByLookType", LuaScriptInterface::luaGameGetMountIdByLookType);
@@ -2813,7 +2814,23 @@ void LuaScriptInterface::registerFunctions()
 	registerMethod(L, "Player", "getBankBalance", LuaScriptInterface::luaPlayerGetBankBalance);
 	registerMethod(L, "Player", "setBankBalance", LuaScriptInterface::luaPlayerSetBankBalance);
 
-	registerMethod(L, "Player", "addItem", LuaScriptInterface::luaPlayerAddItem);
+	// Prey System
+	registerMethod(L, "Player", "getPreyState", LuaScriptInterface::luaPlayerGetPreyState);
+	registerMethod(L, "Player", "changePreyState", LuaScriptInterface::luaPlayerChangePreyState);
+	registerMethod(L, "Player", "getBonusRerollCount", LuaScriptInterface::luaPlayerGetBonusRerollCount);
+	registerMethod(L, "Player", "setBonusRerollCount", LuaScriptInterface::luaPlayerSetBonusRerollCount);
+	registerMethod(L, "Player", "getPreyData", LuaScriptInterface::luaPlayerGetPreyData);
+	registerMethod(L, "Player", "setPreyData", LuaScriptInterface::luaPlayerSetPreyData);
+	registerMethod(L, "Player", "getFreeRerollTime", LuaScriptInterface::luaPlayerGetFreeRerollTime);
+	registerMethod(L, "Player", "setFreeRerollTime", LuaScriptInterface::luaPlayerSetFreeRerollTime);
+	registerMethod(L, "Player", "getPreyCards", LuaScriptInterface::luaPlayerGetPreyCards);
+	registerMethod(L, "Player", "addPreyCards", LuaScriptInterface::luaPlayerAddPreyCards);
+	registerMethod(L, "Player", "removePreyCards", LuaScriptInterface::luaPlayerRemovePreyCards);
+	registerMethod(L, "Player", "getPreyWildcards", LuaScriptInterface::luaPlayerGetPreyCards);
+	registerMethod(L, "Player", "addPreyWildcards", LuaScriptInterface::luaPlayerAddPreyCards);
+	registerMethod(L, "Player", "removePreyWildcards", LuaScriptInterface::luaPlayerRemovePreyCards);
+
+	registerMethod(L, "Player", "addItem", LuaScriptInterface::luaPlayerAddItemEx);
 	registerMethod(L, "Player", "addItemEx", LuaScriptInterface::luaPlayerAddItemEx);
 	registerMethod(L, "Player", "removeItem", LuaScriptInterface::luaPlayerRemoveItem);
 	registerMethod(L, "Player", "sendSupplyUsed", LuaScriptInterface::luaPlayerSendSupplyUsed);
@@ -3282,6 +3299,7 @@ void LuaScriptInterface::registerFunctions()
 	registerMethod(L, "MonsterType", "changeTargetSpeed", LuaScriptInterface::luaMonsterTypeChangeTargetSpeed);
 
 	registerMethod(L, "MonsterType", "bestiaryInfo", LuaScriptInterface::luaMonsterTypeBestiaryInfo);
+	registerMethod(L, "MonsterType", "getOutfit", LuaScriptInterface::luaMonsterTypeGetOutfit); // Prey System
 
 	// Loot
 	registerClass(L, "Loot", "", LuaScriptInterface::luaCreateLoot);
@@ -15559,6 +15577,298 @@ int LuaScriptInterface::luaMonsterTypeBestiaryInfo(lua_State* L)
 
 	std::cout << "[Warning - LuaScriptInterface::luaMonsterTypeBestiaryInfo] bestiaryInfo must be a table.\n";
 	lua_pushnil(L);
+	return 1;
+}
+
+// Prey System
+int LuaScriptInterface::luaPlayerGetPreyState(lua_State* L)
+{
+	// player:getPreyState(preySlotId)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (player) {
+		uint8_t preySlotId = tfs::lua::getNumber<uint8_t>(L, 2);
+		if (preySlotId >= PREY_SLOTCOUNT) {
+			lua_pushnil(L);
+		} else {
+			lua_pushnumber(L, player->getPreyData(preySlotId).state);
+		}
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerChangePreyState(lua_State* L)
+{
+	// player:changePreyState(preySlotId, stateId)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (player) {
+		uint8_t preySlotId = tfs::lua::getNumber<uint8_t>(L, 2);
+		uint8_t state = tfs::lua::getNumber<uint8_t>(L, 3);
+		if (preySlotId >= PREY_SLOTCOUNT) {
+			lua_pushnil(L);
+		} else {
+			player->getPreyData(preySlotId).state = state;
+			lua_pushboolean(L, true);
+		}
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerGetBonusRerollCount(lua_State* L)
+{
+	// player:getBonusRerollCount()
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (player) {
+		lua_pushnumber(L, player->getBonusRerollCount());
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerSetBonusRerollCount(lua_State* L)
+{
+	// player:setBonusRerollCount(count)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (player) {
+		uint64_t count = tfs::lua::getNumber<uint64_t>(L, 2);
+		player->setBonusRerollCount(count);
+		lua_pushboolean(L, true);
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerGetPreyData(lua_State* L)
+{
+	// player:getPreyData(slotId)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	uint8_t slotId = tfs::lua::getNumber<uint8_t>(L, 2);
+	if (slotId >= PREY_SLOTCOUNT) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const PreyData& preyData = player->getPreyData(slotId);
+	lua_createtable(L, 0, 7);
+	setField(L, "state", preyData.state);
+	setField(L, "bonusType", static_cast<uint8_t>(preyData.bonusType));
+	setField(L, "bonusValue", preyData.bonusValue);
+	setField(L, "bonusGrade", preyData.bonusGrade);
+	tfs::lua::pushString(L, preyData.preyMonster);
+	lua_setfield(L, -2, "preyMonster");
+	setField(L, "timeLeft", preyData.timeLeft);
+
+	// Lista de monstros
+	lua_pushstring(L, "preyList");
+	lua_createtable(L, preyData.preyList.size(), 0);
+	int index = 0;
+	for (const std::string& monsterName : preyData.preyList) {
+		lua_pushnumber(L, ++index);
+		tfs::lua::pushString(L, monsterName);
+		lua_settable(L, -3);
+	}
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerSetPreyData(lua_State* L)
+{
+	// player:setPreyData(slotId, data)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	uint8_t slotId = tfs::lua::getNumber<uint8_t>(L, 2);
+	if (slotId >= PREY_SLOTCOUNT || !lua_istable(L, 3)) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	PreyData& preyData = player->getPreyData(slotId);
+
+	lua_pushstring(L, "state");
+	lua_gettable(L, 3);
+	if (lua_isnumber(L, -1)) {
+		preyData.state = tfs::lua::getNumber<uint8_t>(L, -1);
+	}
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "bonusType");
+	lua_gettable(L, 3);
+	if (lua_isnumber(L, -1)) {
+		preyData.bonusType = static_cast<PreyBonus_t>(tfs::lua::getNumber<uint8_t>(L, -1));
+	}
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "bonusValue");
+	lua_gettable(L, 3);
+	if (lua_isnumber(L, -1)) {
+		preyData.bonusValue = tfs::lua::getNumber<uint16_t>(L, -1);
+	}
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "bonusGrade");
+	lua_gettable(L, 3);
+	if (lua_isnumber(L, -1)) {
+		preyData.bonusGrade = tfs::lua::getNumber<uint8_t>(L, -1);
+	}
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "preyMonster");
+	lua_gettable(L, 3);
+	if (lua_isstring(L, -1)) {
+		preyData.preyMonster = tfs::lua::getString(L, -1);
+	}
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "timeLeft");
+	lua_gettable(L, 3);
+	if (lua_isnumber(L, -1)) {
+		preyData.timeLeft = tfs::lua::getNumber<uint16_t>(L, -1);
+	}
+	lua_pop(L, 1);
+
+	// Lista de monstros
+	lua_pushstring(L, "preyList");
+	lua_gettable(L, 3);
+	if (lua_istable(L, -1)) {
+		preyData.preyList.clear();
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0) {
+			if (lua_isstring(L, -1)) {
+				preyData.preyList.push_back(tfs::lua::getString(L, -1));
+			}
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerGetFreeRerollTime(lua_State* L)
+{
+	// player:getFreeRerollTime(slotId)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	uint8_t slotId = tfs::lua::getNumber<uint8_t>(L, 2);
+	if (slotId >= PREY_SLOTCOUNT) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_pushnumber(L, player->getFreeRerollTime(slotId));
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerSetFreeRerollTime(lua_State* L)
+{
+	// player:setFreeRerollTime(slotId, time)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	uint8_t slotId = tfs::lua::getNumber<uint8_t>(L, 2);
+	uint16_t time = tfs::lua::getNumber<uint16_t>(L, 3);
+
+	if (slotId >= PREY_SLOTCOUNT) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	player->setFreeRerollTime(slotId, time);
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerGetPreyCards(lua_State* L)
+{
+	// player:getPreyCards() or player:getPreyWildcards()
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (player) {
+		lua_pushnumber(L, player->getPreyWildcards());
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerAddPreyCards(lua_State* L)
+{
+	// player:addPreyCards(amount) or player:addPreyWildcards(amount)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (player) {
+		uint32_t amount = tfs::lua::getNumber<uint32_t>(L, 2);
+		player->addPreyWildcards(amount);
+		lua_pushboolean(L, true);
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerRemovePreyCards(lua_State* L)
+{
+	// player:removePreyCards(amount) or player:removePreyWildcards(amount)
+	Player* player = tfs::lua::getUserdata<Player>(L, 1);
+	if (player) {
+		uint32_t amount = tfs::lua::getNumber<uint32_t>(L, 2);
+		lua_pushboolean(L, player->removePreyWildcards(amount));
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaMonsterTypeGetOutfit(lua_State* L)
+{
+	// monsterType:getOutfit()
+	MonsterType* monsterType = tfs::lua::getUserdata<MonsterType>(L, 1);
+	if (!monsterType) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_createtable(L, 0, 6);
+	setField(L, "lookType", monsterType->info.outfit.lookType);
+	setField(L, "lookHead", monsterType->info.outfit.lookHead);
+	setField(L, "lookBody", monsterType->info.outfit.lookBody);
+	setField(L, "lookLegs", monsterType->info.outfit.lookLegs);
+	setField(L, "lookFeet", monsterType->info.outfit.lookFeet);
+	setField(L, "lookAddons", monsterType->info.outfit.lookAddons);
+	return 1;
+}
+
+int LuaScriptInterface::luaGameGetPreyMonsters(lua_State* L)
+{
+	// Game.getPreyMonsters()
+	lua_createtable(L, 0, 0);
+	int index = 0;
+	for (const auto& [name, mType] : g_monsters.monsters) {
+		lua_pushnumber(L, ++index);
+		tfs::lua::pushString(L, mType.name);
+		lua_settable(L, -3);
+	}
 	return 1;
 }
 

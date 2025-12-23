@@ -4730,3 +4730,102 @@ void Player::updateRegeneration()
 		condition->setParam(CONDITION_PARAM_MANATICKS, vocation->getManaGainTicks() * 1000);
 	}
 }
+
+
+// Prey System - Load from database
+void Player::loadPreyData()
+{
+	Database& db = Database::getInstance();
+	
+	std::ostringstream query;
+	query << "SELECT `prey_wildcards` FROM `players` WHERE `id` = " << getGUID();
+	DBResult_ptr result = db.storeQuery(query.str());
+	if (result) {
+		preyWildcards = result->getNumber<uint32_t>("prey_wildcards");
+	}
+	
+	query.str(std::string());
+	query << "SELECT * FROM `player_prey` WHERE `player_id` = " << getGUID();
+	result = db.storeQuery(query.str());
+	
+	if (result) {
+		do {
+			uint8_t slot = result->getNumber<uint8_t>("slot");
+			if (slot >= PREY_SLOTCOUNT) {
+				continue;
+			}
+			
+			PreyData& data = preyData[slot];
+			data.state = result->getNumber<uint8_t>("state");
+			data.preyMonster = result->getString("raceid");
+			data.bonusType = static_cast<PreyBonus_t>(result->getNumber<uint8_t>("bonus_type"));
+			data.bonusValue = result->getNumber<uint16_t>("bonus_value");
+			data.bonusGrade = result->getNumber<uint8_t>("bonus_grade");
+			data.timeLeft = result->getNumber<uint16_t>("bonus_time_left");
+			data.freeRerollTime = result->getNumber<uint16_t>("free_reroll");
+			
+			std::string monsterListStr(result->getString("monster_list"));
+			if (!monsterListStr.empty()) {
+				std::istringstream iss(monsterListStr);
+				std::string monster;
+				while (std::getline(iss, monster, ',')) {
+					if (!monster.empty()) {
+						data.preyList.push_back(monster);
+					}
+				}
+			}
+		} while (result->next());
+	}
+}
+
+void Player::savePreyData()
+{
+	Database& db = Database::getInstance();
+	
+	std::ostringstream query;
+	query << "UPDATE `players` SET `prey_wildcards` = " << preyWildcards << " WHERE `id` = " << getGUID();
+	db.executeQuery(query.str());
+	
+	for (uint8_t slot = 0; slot < PREY_SLOTCOUNT; ++slot) {
+		const PreyData& data = preyData[slot];
+		
+		std::ostringstream monsterList;
+		for (size_t i = 0; i < data.preyList.size(); ++i) {
+			if (i > 0) {
+				monsterList << ",";
+			}
+			monsterList << data.preyList[i];
+		}
+		
+		query.str(std::string());
+		query << "INSERT INTO `player_prey` (`player_id`, `slot`, `state`, `raceid`, `bonus_type`, `bonus_value`, `bonus_grade`, `bonus_time_left`, `free_reroll`, `option`, `monster_list`) VALUES ("
+		      << getGUID() << ", "
+		      << static_cast<int>(slot) << ", "
+		      << static_cast<int>(data.state) << ", "
+		      << db.escapeString(data.preyMonster) << ", "
+		      << static_cast<int>(data.bonusType) << ", "
+		      << data.bonusValue << ", "
+		      << static_cast<int>(data.bonusGrade) << ", "
+		      << data.timeLeft << ", "
+		      << data.freeRerollTime << ", "
+		      << "0, "
+		      << db.escapeString(monsterList.str())
+		      << ") ON DUPLICATE KEY UPDATE "
+		      << "`state` = " << static_cast<int>(data.state) << ", "
+		      << "`raceid` = " << db.escapeString(data.preyMonster) << ", "
+		      << "`bonus_type` = " << static_cast<int>(data.bonusType) << ", "
+		      << "`bonus_value` = " << data.bonusValue << ", "
+		      << "`bonus_grade` = " << static_cast<int>(data.bonusGrade) << ", "
+		      << "`bonus_time_left` = " << data.timeLeft << ", "
+		      << "`free_reroll` = " << data.freeRerollTime << ", "
+		      << "`monster_list` = " << db.escapeString(monsterList.str());
+		
+		if (db.executeQuery(query.str())) {
+			std::cout << "[PREY DB] Slot " << static_cast<int>(slot) << " saved successfully" << std::endl;
+		} else {
+			std::cout << "[PREY DB ERROR] Failed to save slot " << static_cast<int>(slot) << "!" << std::endl;
+		}
+	}
+	
+	std::cout << "[PREY DB] Prey data save completed" << std::endl;
+}

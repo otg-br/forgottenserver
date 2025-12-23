@@ -276,6 +276,7 @@ private:
 	static int luaGameGetNpcCount(lua_State* L);
 	static int luaGameGetMonsterTypes(lua_State* L);
 	static int luaGameGetBestiary(lua_State* L);
+	static int luaGameGetPreyMonsters(lua_State* L); // Prey System
 	static int luaGameGetCurrencyItems(lua_State* L);
 	static int luaGameGetItemTypeByClientId(lua_State* L);
 	static int luaGameGetMountIdByLookType(lua_State* L);
@@ -706,6 +707,22 @@ private:
 
 	static int luaPlayerGetBankBalance(lua_State* L);
 	static int luaPlayerSetBankBalance(lua_State* L);
+
+	// Prey System
+	static int luaPlayerGetPreyState(lua_State* L);
+	static int luaPlayerChangePreyState(lua_State* L);
+	static int luaPlayerGetBonusRerollCount(lua_State* L);
+	static int luaPlayerSetBonusRerollCount(lua_State* L);
+	static int luaPlayerGetPreyData(lua_State* L);
+	static int luaPlayerSetPreyData(lua_State* L);
+	static int luaPlayerGetFreeRerollTime(lua_State* L);
+	static int luaPlayerSetFreeRerollTime(lua_State* L);
+	static int luaPlayerGetPreyCards(lua_State* L);
+	static int luaPlayerAddPreyCards(lua_State* L);
+	static int luaPlayerRemovePreyCards(lua_State* L);
+	static int luaPlayerGetPreyWildcards(lua_State* L);
+	static int luaPlayerAddPreyWildcards(lua_State* L);
+	static int luaPlayerRemovePreyWildcards(lua_State* L);
 
 	static int luaPlayerAddItem(lua_State* L);
 	static int luaPlayerAddItemEx(lua_State* L);
@@ -1155,6 +1172,7 @@ private:
 	static int luaMonsterTypeChangeTargetSpeed(lua_State* L);
 
 	static int luaMonsterTypeBestiaryInfo(lua_State* L);
+	static int luaMonsterTypeGetOutfit(lua_State* L); // Prey System
 
 	// Loot
 	static int luaCreateLoot(lua_State* L);
