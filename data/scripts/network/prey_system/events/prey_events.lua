@@ -50,10 +50,83 @@ preyKill:register()
 
 local preyExperience = Event()
 
+local function checkPreyTick(player)
+	local lastTick = player:getStorageValue(PlayerStorageKeys.preyTick)
+	if lastTick > os.time() then
+		player:setStorageValue(PlayerStorageKeys.preyTick, os.time())
+		lastTick = os.time()
+	end
+	
+	if (os.time() - lastTick) < 60 then
+		return
+	end
+	
+	player:setStorageValue(PlayerStorageKeys.preyTick, os.time())
+	
+	local changed = false
+	for slotId = 0, 2 do
+		local slot = player:getPreyData(slotId)
+		if slot and slot.state == PreyDataState.Active then
+			slot.timeLeft = slot.timeLeft - 60
+			
+			if slot.timeLeft <= 0 then
+				slot.timeLeft = 0
+				
+				local rerolled = false
+				if slot.option == 1 then
+					if player:removePreyWildcards(PreyConfig.bonusRerollPrice) then
+						local bonus = PreyHelper.getRandomBonus()
+						slot.bonusType = bonus.type
+						slot.bonusValue = bonus.value
+						slot.bonusGrade = bonus.rarity
+						slot.timeLeft = PreyConfig.preyDuration * 60
+						player:sendTextMessage(MESSAGE_STATUS_SMALL, "Your prey bonus has been automatically rerolled.")
+						rerolled = true
+					else
+						player:sendTextMessage(MESSAGE_STATUS_SMALL, "You don't have enough wildcards for automatic reroll.")
+					end
+				elseif slot.option == 2 then
+					if player:removePreyWildcards(PreyConfig.lockRerollPrice) then
+						local bonus = PreyHelper.getRandomBonus()
+						slot.bonusType = bonus.type
+						slot.bonusValue = bonus.value
+						slot.bonusGrade = bonus.rarity
+						slot.timeLeft = PreyConfig.preyDuration * 60
+						player:sendTextMessage(MESSAGE_STATUS_SMALL, "Your prey has been locked and bonus rerolled.")
+						rerolled = true
+					else
+						player:sendTextMessage(MESSAGE_STATUS_SMALL, "You don't have enough wildcards to lock your prey.")
+					end
+				end
+				
+				if not rerolled then
+					slot.state = PreyDataState.Selection
+					slot.bonusType = PreyBonus.None
+					slot.bonusValue = 0
+					slot.bonusGrade = PreyBonusRarity.COMMON
+					player:sendTextMessage(MESSAGE_STATUS_SMALL, "Your prey bonus has expired.")
+				end
+				
+				changed = true
+			end
+			
+			player:setPreyData(slotId, slot)
+		end
+	end
+	
+	if changed then
+		for slotId = 0, 2 do
+			player:reloadPreySlot(slotId)
+		end
+	end
+end
+
 function preyExperience.onGainExperience(player, source, exp, rawExp)
 	if not source or not source:isMonster() then
 		return exp
 	end
+
+    checkPreyTick(player)
 
 	local monsterType = source:getType()
 	if not monsterType then
@@ -129,6 +202,10 @@ function preyLogin.onLogin(player)
 			}
 			player:setPreyData(1, preyData)
 		end
+	end
+	
+	for slotId = 0, 2 do
+		player:reloadPreySlot(slotId)
 	end
 
 	return true

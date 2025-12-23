@@ -6,6 +6,7 @@ PreyConfig = {
 	rerollPrice = 50,
 	rerollPricePerLevel = 150,
 	bonusRerollPrice = 1,
+	lockRerollPrice = 5,
 	selectionListPrice = 5,
 	selectionCount = 9
 }

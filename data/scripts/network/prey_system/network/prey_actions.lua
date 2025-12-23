@@ -52,7 +52,7 @@ function handler.onReceive(player, msg)
 			return
 		end
 		
-		local wildcards = player:getPreyWildcards()
+	local wildcards = player:getPreyWildcards()
 		if wildcards < PreyConfig.bonusRerollPrice then
 			player:sendTextMessage(MESSAGE_STATUS_SMALL, string.format("You don't have enough prey wildcards. You need %d wildcards.", PreyConfig.bonusRerollPrice))
 			return
@@ -62,6 +62,9 @@ function handler.onReceive(player, msg)
 			return
 		end
 		
+		print("[PREY DEBUG] Wildcards removed. Generating bonus...")
+
+		
 		local bonus = generateRandomPreyBonus()
 		slot.bonusType = bonus.type
 		slot.bonusValue = bonus.value
@@ -70,7 +73,7 @@ function handler.onReceive(player, msg)
 		
 		local resourceMsg = NetworkMessage()
 		resourceMsg:addByte(0xEE)
-		resourceMsg:addByte(2)
+		resourceMsg:addByte(10)
 		resourceMsg:addU64(player:getPreyWildcards())
 		resourceMsg:sendToPlayer(player)
 		resourceMsg:delete()
@@ -96,7 +99,7 @@ function handler.onReceive(player, msg)
 		slot.bonusType = bonus.type
 		slot.bonusValue = bonus.value
 		slot.bonusGrade = bonus.rarity
-		slot.timeLeft = PreyConfig.preyDuration
+		slot.timeLeft = PreyConfig.preyDuration * 60
 		slot.preyList = {}
 		player:setPreyData(slotId, slot)
 		
@@ -120,7 +123,7 @@ function handler.onReceive(player, msg)
 		
 		local resourceMsg = NetworkMessage()
 		resourceMsg:addByte(0xEE)
-		resourceMsg:addByte(2)
+		resourceMsg:addByte(10)
 		resourceMsg:addU64(player:getPreyWildcards())
 		resourceMsg:sendToPlayer(player)
 		resourceMsg:delete()
@@ -144,7 +147,7 @@ function handler.onReceive(player, msg)
 		slot.bonusType = bonus.type
 		slot.bonusValue = bonus.value
 		slot.bonusGrade = bonus.rarity
-		slot.timeLeft = PreyConfig.preyDuration
+		slot.timeLeft = PreyConfig.preyDuration * 60
 		slot.preyList = {}
 		player:setPreyData(slotId, slot)
 		
@@ -152,8 +155,10 @@ function handler.onReceive(player, msg)
 		
 	elseif action == PreyAction.Option then
 		local option = msg:getByte()
+		
 		slot.option = option
 		player:setPreyData(slotId, slot)
+		
 		player:reloadPreySlot(slotId)
 	end
 end

@@ -605,7 +605,8 @@ end
 function Player.removePreyWildcards(self, amount)
 	local current = self:getPreyWildcards()
 	if current >= amount then
-		return self:setStorageValue(PlayerStorageKeys.preyWildcards, current - amount)
+		self:setStorageValue(PlayerStorageKeys.preyWildcards, current - amount)
+		return true
 	end
 	return false
 end
@@ -888,8 +889,8 @@ function Player.reloadPreySlot(self, slotId)
 		msg:addU16(0)
 	end
 	
-	local freeRerollTimeSeconds = self:getFreeRerollTime(slotId) * 60
-	msg:addU32(freeRerollTimeSeconds)
+	local freeRerollMinutes = self:getFreeRerollTime(slotId)
+	msg:addU32(freeRerollMinutes * 60)
 	msg:addByte(slot.option or 0)
 	
 	msg:sendToPlayer(self)

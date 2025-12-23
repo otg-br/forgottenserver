@@ -47,4 +47,5 @@ PlayerStorageKeys = {
 	-- Prey System:
 	preySlotBase = 500000, -- Base storage for prey slots (500000, 500001, 500002)
 	preyWildcards = 500010, -- Prey wildcards count
+	preyTick = 500011, -- Last prey tick time
 }

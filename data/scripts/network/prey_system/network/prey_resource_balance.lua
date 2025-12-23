@@ -3,7 +3,7 @@ local handler = PacketHandler(0xED)
 function handler.onReceive(player, msg)
 	local RESOURCE_BANK = 0
 	local RESOURCE_INVENTORY = 1
-	local RESOURCE_PREY_CARDS = 2
+	local RESOURCE_PREY_CARDS = 10
 	local RESOURCE_TASK_HUNTING = 3
 	
 	local function sendResource(resourceType, value)
@@ -79,8 +79,9 @@ function handler.onReceive(player, msg)
 			end
 		end
 		
-		local freeRerollTimeSeconds = player:getFreeRerollTime(slotId) * 60
-		preyMsg:addU32(freeRerollTimeSeconds)
+		local freeRerollMinutes = player:getFreeRerollTime(slotId)
+		local freeRerollSeconds = freeRerollMinutes * 60
+		preyMsg:addU32(freeRerollSeconds)
 		preyMsg:addByte(0)
 		
 		preyMsg:sendToPlayer(player)

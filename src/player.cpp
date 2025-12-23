@@ -4742,6 +4742,9 @@ void Player::loadPreyData()
 	DBResult_ptr result = db.storeQuery(query.str());
 	if (result) {
 		preyWildcards = result->getNumber<uint32_t>("prey_wildcards");
+		std::cout << "[PREY DEBUG] Loaded " << preyWildcards << " wildcards for player " << getName() << std::endl;
+	} else {
+		std::cout << "[PREY DEBUG] Failed to load wildcards query for player " << getName() << std::endl;
 	}
 	
 	query.str(std::string());
