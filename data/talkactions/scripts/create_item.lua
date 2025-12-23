@@ -33,17 +33,49 @@ local function getDestination(target, param, index)
 end
 
 local function addItemToDestination(destination, itemId, count, subType)
-	local result
+	-- Sanitization
+	if not subType then subType = 1 end
 
+	local result = {}
+	
 	if destination:isCreature() and destination:isPlayer() then
-		result = destination:addItem(itemId, count, true, subType, CONST_SLOT_WHEREEVER)
+		local item = Game.createItem(itemId, count)
+		if not item then
+			return {false}
+		end
+		
+		-- player:addItem returns a ReturnValue number (0 = success)
+		local ret = destination:addItem(item, true, CONST_SLOT_WHEREEVER)
+		if ret ~= RETURNVALUE_NOERROR then
+			item:remove()
+			return {false}
+		end
+		table.insert(result, item)
+		
 	elseif destination:isContainer() then
-		result = destination:addItem(itemId, count, subType, INDEX_WHEREEVER)
+		-- Container might support ID or Object. Safest is Object if using addItemEx
+		-- But existing code used addItem with ID. Let's try creating object too to be safe.
+		local item = Game.createItem(itemId, count)
+		if not item then return {false} end
+		
+		local ret = destination:addItemEx(item)
+		if ret ~= RETURNVALUE_NOERROR then
+			item:remove()
+			return {false}
+		end
+		table.insert(result, item)
+		
 	elseif destination:isTile() then
-		result = destination:addItem(itemId, count, subType)
+		-- For tiles, creating directly on position is best
+		local item = Game.createItem(itemId, count, destination:getPosition())
+		if item then
+			table.insert(result, item)
+		else
+			return {false}
+		end
 	end
 
-	return type(result) == "table" and result or {result}
+	return result
 end
 
 local function sendPlayerItemInformation(player, data)
@@ -70,16 +102,131 @@ function onSay(player, words, param)
 		return false
 	end
 
-	if not param:find(',') then
-		player:sendTextMessage(MESSAGE_INFO_DESCR, string.format("Usage: %s [item id or name], [count], [subtype or key number], [destination], [player name], [index].\nPossible destinations: %s", words, table.concat(destinations, ", ")))
-		return false
-	end
+	local itemType
+	local count = 1
+	local subType
+	local destinationParam
+	local targetName
+	local indexParam
+	local keyNumber
 
-	local split = param:splitTrimmed(",")
-	local itemType = ItemType(split[1])
-	if itemType:getId() == 0 then
-		itemType = ItemType(tonumber(split[1]))
-		if not tonumber(split[1]) or itemType:getId() == 0 then
+	-- Check if param has comma (Comma separated strictly)
+	if param:find(',') then
+		local split = param:splitTrimmed(",")
+		
+		-- Item check
+		itemType = ItemType(split[1])
+		if itemType:getId() == 0 then
+			itemType = ItemType(tonumber(split[1]))
+			if not tonumber(split[1]) or itemType:getId() == 0 then
+				player:sendCancelMessage("There is no item with that id or name.")
+				return false
+			end
+		end
+
+		if table.contains(invalidIds, itemType:getId()) then
+			return false
+		end
+
+		-- Parse remaining arguments
+		for i = 2, #split do
+			local arg = split[i]:trim()
+			local lowerArg = arg:lower()
+			local numArg = tonumber(arg)
+
+			if table.contains(destinations, lowerArg) and not destinationParam then
+				destinationParam = lowerArg
+			elseif numArg then
+				if not count or count == 1 then -- Prefer setting count first if default
+					count = itemType:isFluidContainer() and math.max(0, math.min(numArg, itemType:getCharges())) or math.min(10000, math.max(1, numArg))
+				elseif not subType and not keyNumber then
+					if not itemType:isStackable() then
+						if itemType:isKey() then
+							keyNumber = numArg
+						else
+							subType = numArg
+						end
+					else
+						subType = 1
+					end
+				elseif not indexParam and destinationParam then
+					indexParam = numArg
+				end
+			elseif not targetName then
+				targetName = arg
+			end
+		end
+
+	else
+		-- Space separated parsing (Attempt to find item name first)
+		-- Try largest match first? No, we need to split by space.
+		local split = param:split(" ")
+		local foundInfo = false
+		
+		-- Attempt to find item name by progressively joining parts
+		for i = #split, 1, -1 do
+			local nameAttempt = table.concat(split, " ", 1, i)
+			local tempItem = ItemType(nameAttempt)
+			if tempItem:getId() ~= 0 then
+				itemType = tempItem
+				
+				-- Parse rest
+				for j = i + 1, #split do
+					local arg = split[j]
+					local lowerArg = arg:lower()
+					local numArg = tonumber(arg)
+					
+					if table.contains(destinations, lowerArg) and not destinationParam then
+						destinationParam = lowerArg
+					elseif numArg then
+						-- Simple logic for space separated: Number is usually count
+						if count == 1 then -- We assume 1 is default, so if we see a number update it
+							count = itemType:isFluidContainer() and math.max(0, math.min(numArg, itemType:getCharges())) or math.min(10000, math.max(1, numArg))
+						else
+							-- If count already set, maybe subtype?
+							if not subType then subType = numArg end
+						end
+					elseif not targetName then
+						targetName = arg
+					end
+				end
+				
+				foundInfo = true
+				break
+			end
+		end
+		
+		-- Try checking if first arg is numeric ID
+		if not foundInfo then
+			local possibleId = tonumber(split[1])
+			if possibleId then
+				local tempItem = ItemType(possibleId)
+				if tempItem:getId() ~= 0 then
+					itemType = tempItem
+					-- Parse rest same as above
+					for j = 2, #split do
+						local arg = split[j]
+						local lowerArg = arg:lower()
+						local numArg = tonumber(arg)
+						
+						if table.contains(destinations, lowerArg) and not destinationParam then
+							destinationParam = lowerArg
+						elseif numArg then
+							if count == 1 then
+								count = itemType:isFluidContainer() and math.max(0, math.min(numArg, itemType:getCharges())) or math.min(10000, math.max(1, numArg))
+							else
+								if not subType then subType = numArg end
+							end
+						elseif not targetName then
+							targetName = arg
+						end
+					end
+					foundInfo = true
+				end
+			end
+		end
+		
+		if not foundInfo then
 			player:sendCancelMessage("There is no item with that id or name.")
 			return false
 		end
@@ -89,37 +236,6 @@ function onSay(player, words, param)
 		return false
 	end
 
-	local count, subType, keyNumber, destinationParam, targetName, indexParam
-
-	for i = 2, #split do
-		local arg = split[i]:trim()
-		local lowerArg = arg:lower()
-		local numArg = tonumber(arg)
-
-		if table.contains(destinations, lowerArg) and not destinationParam then
-			destinationParam = lowerArg
-		elseif numArg then
-			if not count then
-				count = itemType:isFluidContainer() and math.max(0, math.min(numArg, itemType:getCharges())) or
-							math.min(10000, math.max(1, numArg))
-			elseif not subType and not keyNumber then
-				if not itemType:isStackable() then
-					if itemType:isKey() then
-						keyNumber = numArg
-					else
-						subType = numArg
-					end
-				else
-					subType = 1
-				end
-			elseif not indexParam and destinationParam then
-				indexParam = numArg
-			end
-		elseif not targetName then
-			targetName = arg
-		end
-	end
-
 	local targetPlayer = targetName and Player(targetName) or player
 	if targetName and not targetPlayer then
 		player:sendCancelMessage("Player \"" .. targetName .. "\" not found.")
@@ -127,15 +243,25 @@ function onSay(player, words, param)
 	end
 
 	local destination = getDestination(targetPlayer, destinationParam, indexParam)
+	
+	if not subType then subType = 1 end
+	
 	local result = addItemToDestination(destination, itemType:getId(), count, subType)
 
 	for _, item in ipairs(result) do
-		if itemType:isKey() then
-			item:setAttribute(ITEM_ATTRIBUTE_ACTIONID, keyNumber)
+		if item and type(item) ~= "boolean" then
+			if itemType:isKey() then
+				item:setAttribute(ITEM_ATTRIBUTE_ACTIONID, keyNumber)
+			end
+			if not itemType:isStackable() then
+				item:decay()
+			end
 		end
-		if not itemType:isStackable() then
-			item:decay()
-		end
+	end
+
+	if #result > 0 and (type(result[1]) == "boolean" and not result[1]) then
+		player:sendCancelMessage("Could not create item. (Limit reached or invalid item)")
+		return false
 	end
 
 	sendPlayerItemInformation(player, {
