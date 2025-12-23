@@ -30,6 +30,39 @@ event.onDropLoot = function(self, corpse)
 		else
 			text = ("Loot of %s: nothing (due to low stamina)."):format(mType:getNameDescription())
 		end
+		
+		local preyActivators = {}
+		local monsterName = mType:getName()
+		
+		local function checkPrey(p)
+			if not p then return end
+			for slotId = 0, 2 do
+				local slot = p:getPreyData(slotId)
+				if slot and slot.state == 2 and slot.preyMonster == monsterName and slot.bonusType == 3 then
+					table.insert(preyActivators, p:getName())
+					return
+				end
+			end
+		end
+
+		checkPrey(player)
+
+		local party = player:getParty()
+		if party and party:isSharedExperienceActive() then
+			local leader = party:getLeader()
+			if leader and leader:getId() ~= player:getId() then
+				checkPrey(leader)
+			end
+			for _, member in ipairs(party:getMembers()) do
+				if member:getId() ~= player:getId() then
+					checkPrey(member)
+				end
+			end
+		end
+
+		if #preyActivators > 0 then
+			text = text .. string.format(" (active prey bonus for %s)", table.concat(preyActivators, ", "))
+		end
 		local party = player:getParty()
 		if party then
 			party:broadcastPartyLoot(text)

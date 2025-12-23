@@ -147,12 +147,55 @@ function preyExperience.onGainExperience(player, source, exp, rawExp)
 end
 
 preyExperience:register()
+ 
+local preyDamage = CreatureEvent("PreyDamage")
+
+function preyDamage.onHealthChange(creature, attacker, primaryDamage, primaryType, secondaryDamage, secondaryType, origin)
+	if not attacker then
+		return primaryDamage, primaryType, secondaryDamage, secondaryType
+	end
+
+	if attacker:isPlayer() and creature:isMonster() then
+		local player = attacker
+		local monsterName = creature:getName()
+		
+		for slotId = 0, 2 do
+			local slot = player:getPreyData(slotId)
+			if slot and slot.state == 2 and slot.preyMonster == monsterName and slot.bonusType == 0 then
+				local multiplier = 1 + (slot.bonusValue / 100)
+				primaryDamage = primaryDamage * multiplier
+				secondaryDamage = secondaryDamage * multiplier
+				break
+			end
+		end
+	end
+
+	if creature:isPlayer() and attacker:isMonster() then
+		local player = creature
+		local monsterName = attacker:getName()
+		
+		for slotId = 0, 2 do
+			local slot = player:getPreyData(slotId)
+			if slot and slot.state == 2 and slot.preyMonster == monsterName and slot.bonusType == 1 then
+				local multiplier = 1 - (slot.bonusValue / 100)
+				primaryDamage = primaryDamage * multiplier
+				secondaryDamage = secondaryDamage * multiplier
+				break
+			end
+		end
+	end
+
+	return primaryDamage, primaryType, secondaryDamage, secondaryType
+end
+
+preyDamage:register()
 
 local preyLogin = CreatureEvent("PreyLogin")
-
+ 
 function preyLogin.onLogin(player)
 	player:registerEvent("PreyKill")
 	player:registerEvent("PreyExperience")
+	player:registerEvent("PreyDamage")
 
 	local slot0 = player:getPreyData(0)
 	if slot0.state == 0 then

@@ -62,9 +62,6 @@ function handler.onReceive(player, msg)
 			return
 		end
 		
-		print("[PREY DEBUG] Wildcards removed. Generating bonus...")
-
-		
 		local bonus = generateRandomPreyBonus()
 		slot.bonusType = bonus.type
 		slot.bonusValue = bonus.value

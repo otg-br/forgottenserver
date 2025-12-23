@@ -198,6 +198,38 @@ std::string Player::getDescription(int32_t lookDistance) const
 	} else {
 		s << ", which has " << memberCount << " members, " << guild->getMembersOnline().size() << " of them online.";
 	}
+
+	// Prey description
+	for (int i = 0; i < 3; ++i) {
+		const auto& slot = preyData[i];
+		if (slot.state == PREY_STATE_ACTIVE) {
+			s << "\nActive Prey " << (i + 1) << ": ";
+			
+			if (!slot.preyMonster.empty()) {
+				s << slot.preyMonster;
+			} else {
+				s << "Unknown creature";
+			}
+
+			if (slot.bonusType == PREY_BONUS_DAMAGE) {
+				s << " (Damage Boost +";
+			} else if (slot.bonusType == PREY_BONUS_DEFENSE) {
+				s << " (Damage Reduction +";
+			} else if (slot.bonusType == PREY_BONUS_EXPERIENCE) {
+				s << " (XP Bonus +";
+			} else if (slot.bonusType == PREY_BONUS_LOOT) {
+				s << " (Improved Loot +";
+			}
+			
+			s << slot.bonusValue << "%, remaining ";
+			
+			uint16_t hours = slot.timeLeft / 3600;
+			uint16_t minutes = (slot.timeLeft % 3600) / 60;
+			
+			s << hours << ":" << std::setw(2) << std::setfill('0') << minutes << "h)";
+		}
+	}
+
 	return s.str();
 }
 
@@ -4742,9 +4774,6 @@ void Player::loadPreyData()
 	DBResult_ptr result = db.storeQuery(query.str());
 	if (result) {
 		preyWildcards = result->getNumber<uint32_t>("prey_wildcards");
-		std::cout << "[PREY DEBUG] Loaded " << preyWildcards << " wildcards for player " << getName() << std::endl;
-	} else {
-		std::cout << "[PREY DEBUG] Failed to load wildcards query for player " << getName() << std::endl;
 	}
 	
 	query.str(std::string());
@@ -4823,12 +4852,7 @@ void Player::savePreyData()
 		      << "`free_reroll` = " << data.freeRerollTime << ", "
 		      << "`monster_list` = " << db.escapeString(monsterList.str());
 		
-		if (db.executeQuery(query.str())) {
-			std::cout << "[PREY DB] Slot " << static_cast<int>(slot) << " saved successfully" << std::endl;
-		} else {
-			std::cout << "[PREY DB ERROR] Failed to save slot " << static_cast<int>(slot) << "!" << std::endl;
+		if (!db.executeQuery(query.str())) {
 		}
 	}
-	
-	std::cout << "[PREY DB] Prey data save completed" << std::endl;
 }

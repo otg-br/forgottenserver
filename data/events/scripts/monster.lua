@@ -10,6 +10,7 @@ end
 
 function Monster:onSpawn(position, startup, artificial)
 	if hasEvent.onSpawn then
+		self:registerEvent("PreyDamage")
 		return Event.onSpawn(self, position, startup, artificial)
 	end
 	return true

@@ -41,6 +41,16 @@ enum PreyBonus_t : uint8_t
 	PREY_BONUS_NONE = 4
 };
 
+enum PreyState_t : uint8_t
+{
+	PREY_STATE_LOCKED = 0,
+	PREY_STATE_INACTIVE = 1,
+	PREY_STATE_ACTIVE = 2,
+	PREY_STATE_SELECTION = 3,
+	PREY_STATE_SELECTION_CHANGE_MONSTER = 4,
+	PREY_STATE_LIST_SELECTION = 5
+};
+
 struct PreyData
 {
 	uint8_t state = 0;           // 0=locked, 1=inactive, 2=active, 3=selection, 4=selectionChangeMonster, 5=listSelection
