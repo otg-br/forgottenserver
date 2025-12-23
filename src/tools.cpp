@@ -218,7 +218,14 @@ std::string randomBytes(size_t length)
 
 std::string formatDateShort(time_t time)
 {
-	return std::format("{:%d %b %Y}", std::chrono::system_clock::from_time_t(time));
+	const tm* tms = localtime(&time);
+	if (!tms) {
+		return {};
+	}
+
+	char buffer[12];
+	size_t len = strftime(buffer, sizeof(buffer), "%d %b %Y", tms);
+	return {buffer, len};
 }
 
 Position getNextPosition(Direction direction, Position pos)

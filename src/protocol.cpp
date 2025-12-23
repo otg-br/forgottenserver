@@ -45,11 +45,43 @@ bool XTEA_decrypt(NetworkMessage& msg, const xtea::round_keys& key)
 
 Protocol::~Protocol()
 {
-	const auto zlibEndResult = deflateEnd(&zstream);
-	if (zlibEndResult == Z_DATA_ERROR) {
-		std::cout << "ZLIB discarded pending output or unprocessed input while cleaning up stream state" << std::endl;
-	} else if (zlibEndResult == Z_STREAM_ERROR) {
-		std::cout << "ZLIB encountered an error while cleaning up stream state" << std::endl;
+	if (zstream_initialized) {
+		static thread_local std::vector<uint8_t> drainBuffer(NETWORKMESSAGE_MAXSIZE);
+
+		if (zstream.avail_in > 0) {
+			zstream.next_out = drainBuffer.data();
+			zstream.avail_out = drainBuffer.size();
+
+			int ret;
+			do {
+				ret = deflate(&zstream, Z_NO_FLUSH);
+				if (zstream.avail_out == 0) {
+					zstream.next_out = drainBuffer.data();
+					zstream.avail_out = drainBuffer.size();
+				}
+			} while (ret == Z_OK && zstream.avail_in > 0);
+		}
+
+		zstream.next_out = drainBuffer.data();
+		zstream.avail_out = drainBuffer.size();
+
+		int ret;
+		do {
+			ret = deflate(&zstream, Z_FINISH);
+			if (zstream.avail_out == 0) {
+				zstream.next_out = drainBuffer.data();
+				zstream.avail_out = drainBuffer.size();
+			}
+		} while (ret == Z_OK);
+
+		if (zstream.avail_in != 0) {
+			std::cout << "[ZLIB WARNING] Cleanup: avail_in=" << zstream.avail_in << std::endl;
+		}
+	}
+
+	const int zlibEndResult = deflateEnd(&zstream);
+	if (zlibEndResult != Z_OK) {
+		std::cout << "ZLIB cleanup failed: " << zlibEndResult << std::endl;
 	}
 }
 
@@ -122,6 +154,11 @@ bool Protocol::deflateMessage(OutputMessage& msg)
 	}
 
 	const auto size = zstream.total_out;
+
+	if (zstream.avail_in != 0) {
+		std::cout << "deflateMessage: input not consumed! avail_in=" << zstream.avail_in << std::endl;
+	}
+
 	deflateReset(&zstream);
 
 	if (size <= 0) {

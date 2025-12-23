@@ -28,7 +28,7 @@ int getPvpType()
 			return 2;
 	}
 
-	std::unreachable();
+	return 0;
 }
 
 } // namespace

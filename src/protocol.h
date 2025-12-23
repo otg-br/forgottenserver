@@ -16,6 +16,9 @@ public:
 	{
 		if (deflateInit2(&zstream, 6, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
 			std::cout << "ZLIB initialization error: " << (zstream.msg ? zstream.msg : "unknown") << std::endl;
+			zstream_initialized = false;
+		} else {
+			zstream_initialized = true;
 		}
 	}
 	virtual ~Protocol();
@@ -91,6 +94,7 @@ private:
 	bool encryptionEnabled = false;
 	checksumMode_t checksumMode = CHECKSUM_ADLER;
 	bool rawMessages = false;
+	bool zstream_initialized = false;
 
 	z_stream zstream{};
 };
